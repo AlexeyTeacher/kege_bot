@@ -1,6 +1,6 @@
 """Чат-бот в Telegram. Для запуска нужно открыть специально созданный чат @ege_easy_bot
     или создать свой. Тогда не забудь-те поменять TOKEN на свой"""
-
+import logging
 import random
 import datetime
 from pprint import pprint
@@ -9,8 +9,11 @@ import requests
 from telegram.ext import Updater, Filters, MessageHandler, CallbackQueryHandler
 from telegram.ext import CommandHandler, ConversationHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
+
+from db import session
+from models import EGENumber
 from video_url import return_url
-from config import TOKEN, API_HOST
+from config import TOKEN, LOG_FORMAT
 
 with open('log_and_users.txt', 'a', encoding='utf-8') as f:
     f.write(f'{datetime.datetime.now()} >>> Перезапуск приложения\n')
@@ -21,6 +24,8 @@ N_EXAMPLE = ''
 FIRST, SECOND, THIRD, FOURTH, FIFTH = range(5)
 # Данные обратного вызова
 ONE, TWO, THREE, END = range(4)
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
+logger = logging.getLogger('app')
 
 
 def start(update, context):
@@ -207,44 +212,60 @@ def example(update, context):
         number_example = update.message.text.strip().replace('№', '')
         if number_example in [str(i) for i in range(1, 28)]:
             USER_BASE[update.message.from_user.name + " N_EXAMPLE"] = number_example
-            # if number_example in ['19', '20', '21']:
-            #     que = f'SELECT * FROM examples where id_example = {"19"}'
-            # else:
-            #     que = f'SELECT * FROM examples where id_example = {number_example}'
-            """От Яна"""
-            if number_example == '1':
-                tasks = requests.get(f'{API_HOST}/getproblem/5481')
-                if tasks.status_code == 200:
-                    tasks = tasks.json()
-                else:
-                    return
-                # Первый из списка
-                print(tasks)
-                update.message.reply_text(f'<br><img src="https://kpolyakov.spb.ru/cms/images/5481.gif"/><br>',
-                                          parse_mode=ParseMode.HTML)
-                # update.message.reply_text(f"Задание № {tasks.get('id')} "
-                #                           f"Тема: {tasks.get('ege_title')} "
-                #                           f"{tasks.get('content')}",
-                #                           parse_mode=ParseMode.HTML)
-                # context.bot.send_photo(update.message.chat_id, task.gif_url)
-            # if result[3] != 'нет':
-            #     if number_example in ['9', '10', '18', '24', '26', '27']:
-            #         if number_example == '27':
-            #             update.message.reply_text(f'[Скачать файл A 💾]({result[3].split()[0]})\n'
-            #                                       f'[Скачать файл B 💾]({result[3].split()[1]})',
-            #                                       parse_mode='Markdown')
-            #         else:
-            #             update.message.reply_text(f'[Скачать файл 💾]({result[3]})',
-            #                                       parse_mode='Markdown')
-            #     else:
-            #         context.bot.send_photo(update.message.chat_id, task.gif_url)
+            query = f"""SELECT 
+                          json_agg(f) AS DATA 
+                        FROM 
+                          (
+                            SELECT 
+                              t.id, 
+                              t.integrator_id, 
+                              n.task_number, 
+                              n.title, 
+                              c.name as category, 
+                              t.text, 
+                              t.answer, 
+                              t.files 
+                            FROM 
+                              ege.tasks t 
+                              LEFT JOIN ege.ege_numbers n ON t.number_id = n.id 
+                              LEFT JOIN ege.categories c ON t.category_id = c.id 
+                            WHERE 
+                              n.task_number = {number_example}
+                            ORDER BY 
+                              RANDOM() 
+                            LIMIT 
+                              1
+                          ) f"""
+            task = session.execute(query).first()[0][0]
+            text = ''
+            gif_url = ''
+            if '![](https://' in task.get("text"):
+                for line in task.get("text").split('\n'):
+                    if '![](https://' in line:
+                        gif_url = line.replace('![](https://', '').replace('if)', 'if').strip()
+                    else:
+                        text += line + '\n'
             else:
-                update.message.reply_text(f"У меня пока нет *Задания № {number_example}*\n но скоро будет!",
-                                          parse_mode=ParseMode.HTML)
-                context.bot.send_photo(update.message.chat_id, open('test.jpg', 'rb'))
-                draw_keyboard(update)
-                return FIRST
-            USER_BASE[update.message.from_user.name + " ANSWER"] = str(tasks.get('answer')).upper()
+                text = task.get("text")
+            logger.info(text)
+            logger.info(gif_url)
+            update.message.reply_text(f"*Задание № {task.get('integrator_id')}* "
+                                      f"Тема: {task.get('title')} \n"
+                                      f"Категория: {task.get('category')} \n"
+                                      f"{text}",
+                                      parse_mode='Markdown')
+            if gif_url:
+                context.bot.send_photo(update.message.chat_id, gif_url)
+            if task.get('files'):
+                if number_example == '27':
+                    update.message.reply_text(f'[Скачать файл A 💾]({task.get("files")[0].get("url")})\n'
+                                              f'[Скачать файл B 💾]({task.get("files")[1].get("url")})',
+                                              parse_mode='Markdown')
+                else:
+                    update.message.reply_text(f'[Скачать файл 💾]({task.get("files")[0].get("url")})',
+                                              parse_mode='Markdown')
+
+            USER_BASE[update.message.from_user.name + " ANSWER"] = str(task.get('answer')).upper()
             if number_example in ['19', '20', '21']:
                 update.message.reply_text(f"✍ Напишите *ответы* на все три вопроса.\n"
                                           f"*Формат:* 1) X 2) Y 3) Z\n"
