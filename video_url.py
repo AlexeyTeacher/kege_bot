@@ -34,7 +34,7 @@ def return_url(number, url_answer="video"):
         3: ["Поиск информации в реляционных базах данных", "https://kpolyakov.spb.ru/download/ege3.doc"],
         4: ["Кодирование и декодирование информации", "https://kpolyakov.spb.ru/download/ege4.doc"],
         5: ["Анализ и построение алгоритмов для исполнителей", "https://kpolyakov.spb.ru/download/ege5.doc"],
-        6: ["Анализ программ", "https://kpolyakov.spb.ru/download/ege6py.doc"],
+        6: ["Выполнение и анализ простых алгоритмов", "https://kpolyakov.spb.ru/download/ege6.doc"],
         7: ["Кодирование и декодирование информации. Передача информации", "https://kpolyakov.spb.ru/download/ege7.doc"],
         8: ["Перебор слов и системы счисления", "https://kpolyakov.spb.ru/download/ege8.doc"],
         9: ["Эксель", "https://kpolyakov.spb.ru/download/ege9.doc"],
