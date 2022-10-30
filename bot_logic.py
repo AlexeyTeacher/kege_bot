@@ -7,7 +7,7 @@ from telegram.ext import ConversationHandler
 
 from db import session
 from config import FIRST, SECOND, FOURTH, FIFTH, END, THREE, ONE, TWO, THIRD, LOG_FORMAT
-from models import User, Statistic, Task
+from models import User, Statistic, Task, EGENumber, Document, Video
 from video_url import return_url
 
 USER_BASE = {}
@@ -60,14 +60,12 @@ def stop(update, context):
     После выполнения сохраняет в базу данных информацию о сессии пользователя"""
     try:
         name = str(update.message.from_user.name)
-        date = datetime.now()
-        other = '; '.join(USER_BASE[update.message.from_user.name][1:])
-        with open('log_and_users.txt', 'a', encoding='utf-8') as file:
-            file.write(f'{date} >>> {name} >>> {other}\n')
+        old_user = session.query(User).filter(User.login == name).first()
+        stat = session.query(Statistic).filter(Statistic.user_id == old_user.id, Statistic.is_right == True).all()
         update.message.reply_text(f'🖖 Всего доброго, {update.message.from_user.first_name}! \n'
-                                  f'🤓 Правильно решенных задач: {other.count("+")}! \n\n'
+                                  f'🤓 Правильно решенных задач: {len(stat)}! \n\n'
                                   f'Если захотите продолжить подготовку к ЕГЭ, нажмите или напишите /start')
-        USER_BASE.pop(update.message.from_user.name, 'ошибка')
+        logger.info(f'{name} >>> /stop')
     except Exception as e:
         logger.error(f'{e}')
     return ConversationHandler.END
@@ -127,16 +125,18 @@ def doc(update, context):
     try:
         number_lesson = update.message.text.strip().replace('№', '')
         if number_lesson in [str(i) for i in range(1, 28)]:
-            USER_BASE[update.message.from_user.name] += [f'Просмотрен текстовый разбор №{number_lesson}']
-            result = return_url(int(number_lesson), url_answer='doc')
+            theme = session.query(EGENumber).filter(EGENumber.task_number == int(number_lesson)).first()
+            doc_file = session.query(Document).filter(theme.id == Document.number_id).first()
             comment = ['Отличный выбор! 👍', 'Мне тоже нравится это задание! 😻',
                        'Думаю, вам это пригодится! ✍', 'Такое не грех и два раза посмотреть 👌',
                        'Рекомендую читать внимательнее! ✍✍✍']
-            update.message.reply_text(f'*{number_lesson}. {result[0]}*. '
+            update.message.reply_text(f'*{number_lesson}. {theme.title}*. '
                                       f'\n{random.choice(comment)}',
                                       parse_mode='Markdown')
-            update.message.reply_text(f'[Скачать файл 💾]({result[1]})\n_Разбор взят с сайта К.Ю. Полякова_',
+            update.message.reply_text(f'[Скачать файл 💾]({doc_file.url})\n_Разбор взят с сайта К.Ю. Полякова_',
                                       parse_mode='Markdown')
+            logger.info(f'{update.message.from_user.name} listen doc № {number_lesson}')
+
         else:
             update.message.reply_text('Некорректный номер задания, '
                                       'нужно было ввести число от 1 до 27')
@@ -163,20 +163,17 @@ def video(update, context):
     try:
         number_lesson = update.message.text.strip().replace('№', '')
         if number_lesson in [str(i) for i in range(1, 28)]:
-            USER_BASE[update.message.from_user.name] += [f'Просмотрено видео №{number_lesson}']
-            result = return_url(int(number_lesson))
-            if 'http' not in result[1]:
-                update.message.reply_text(f'*{number_lesson}. {result[0]}*. ',
-                                          parse_mode='Markdown')
-                update.message.reply_text(result[1])
-            else:
-                comment = ['Отличный выбор! 👍', 'Мне тоже нравится это видео! 😻',
-                           'Думаю, вам это пригодится! ✍', 'Такое не грех и два раза посмотреть 👌',
-                           'Рекомендую повторять за видео! ✍✍✍']
-                update.message.reply_text(f'*{number_lesson}. {result[0]}*. '
-                                          f'\n{random.choice(comment)}',
-                                          parse_mode='Markdown')
-                update.message.reply_text(result[1])
+            theme = session.query(EGENumber).filter(EGENumber.task_number == int(number_lesson)).first()
+            video_file = session.query(Video).filter(theme.id == Video.number_id).first()
+
+            comment = ['Отличный выбор! 👍', 'Мне тоже нравится это видео! 😻',
+                       'Думаю, вам это пригодится! ✍', 'Такое не грех и два раза посмотреть 👌',
+                       'Рекомендую повторять за видео! ✍✍✍']
+            update.message.reply_text(f'*{number_lesson}. {theme.title}*. '
+                                      f'\n{random.choice(comment)}\n\n'
+                                      f'[видео]({video_file.url})',
+                                      parse_mode='Markdown')
+            logger.info(f'{update.message.from_user.name} listen video № {number_lesson}')
         else:
             update.message.reply_text('Некорректный номер задания, '
                                       'нужно было ввести число от 1 до 27')
