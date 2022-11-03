@@ -6,9 +6,8 @@ from telegram import ParseMode, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ConversationHandler
 
 from db import session
-from config import FIRST, SECOND, FOURTH, FIFTH, END, THREE, ONE, TWO, THIRD, LOG_FORMAT
+from config import FIRST, SECOND, FOURTH, FIFTH, END, THREE, ONE, TWO, THIRD, LOG_FORMAT, HELP
 from models import User, Statistic, Task, EGENumber, Document, Video
-from video_url import return_url
 
 USER_BASE = {}
 N_EXAMPLE = ''
@@ -36,7 +35,10 @@ def start(update, context):
                 InlineKeyboardButton("🎞 Видео", callback_data=str(ONE)),
                 InlineKeyboardButton("🏋 Задание‍", callback_data=str(TWO)),
             ],
-            [InlineKeyboardButton("📁 Текстовый разбор", callback_data=str(THREE))]
+            [
+                InlineKeyboardButton("📁 Текстовый разбор", callback_data=str(THREE)),
+                InlineKeyboardButton("🆘 Справка", callback_data=str(HELP))
+            ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         update.message.reply_text(
@@ -91,8 +93,7 @@ def end(update, context):
 
 def draw_keyboard(update):
     """Рисуем клавиатуру с меню"""
-    try:
-        keyboard = [
+    keyboard = [
             [
                 InlineKeyboardButton("🎞 Видео", callback_data=str(ONE)),
                 InlineKeyboardButton("🏋 Задание‍", callback_data=str(TWO))
@@ -100,12 +101,15 @@ def draw_keyboard(update):
             [
                 InlineKeyboardButton("📁 Текстовый разбор", callback_data=str(THREE)),
                 InlineKeyboardButton("💔 Хватит", callback_data=str(END)),
-            ]
+            ],
+            [InlineKeyboardButton("🆘 Справка", callback_data=str(HELP))]
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    try:
         update.message.reply_text(text="👇 Выбирайте снова 👇", reply_markup=reply_markup)
-    except Exception as e:
+    except AttributeError as e:
         logger.error(f'{e}')
+        update.callback_query.edit_message_text(text="👇 Выбирайте снова 👇", reply_markup=reply_markup)
 
 
 def run_doc(update, context):
@@ -311,3 +315,41 @@ def answer(update, context):
     return FIRST
 
 
+def help_(update, context):
+    """Справка"""
+    keyboard = [
+        [
+            InlineKeyboardButton("🎞 Видео", callback_data=str(ONE)),
+            InlineKeyboardButton("🏋 Задание‍", callback_data=str(TWO))
+        ],
+        [
+            InlineKeyboardButton("📁 Текстовый разбор", callback_data=str(THREE)),
+            InlineKeyboardButton("💔 Хватит", callback_data=str(END)),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    query = update.callback_query
+    query.answer()
+    nums = session.query(EGENumber).order_by(EGENumber.task_number).all()
+    text_nums = '\n'.join([f'{n.task_number}. {n.title}' for n in nums])
+    text = f"*Привет!*\n" \
+           f"ЕГЭ по информатике с 2021 года сдают на компьютере. " \
+           f"В отличие  от практических работ на уроках информатики, " \
+           f"вам не нужно предоставлять решения самих задач. Нужны только ответы. " \
+           f"Если ответов несколько, то их нужно писать *через пробел*. " \
+           f"Даже если это несколько строк, то всё-равно пишите через пробелы.\n" \
+           f"Все типы задач в боте называются *\"номера\"*, их в этом году *27!*\n" \
+           f"В боте можно посмотреть *видео* или прочитать *текстовый разбор* каждого типа задания. " \
+           f"Если вы уже изучили тему, то смело решайте задачи. " \
+           f"Сами задачи взяты с сайта К.Ю. Полякова (номера заданий совпадают).\n" \
+           f"Бот ведет счет правильно решенных задач.\n\n" \
+           f"*Номера задач:*\n"\
+           f"```\n{text_nums}\n```"\
+           f"\n_(Задания 19, 20, 21 объединены в одно, "\
+           f"так как это одна задача с тремя вопросами)_\n\n" \
+           f"*Помимо кнопок есть текстовые команды:*\n" \
+           f"/start - запускает бота после остановки\n" \
+           f"/stop - принудительно завершает работу бота"
+
+    query.edit_message_text(text=text, parse_mode=ParseMode.MARKDOWN, reply_markup=reply_markup)
