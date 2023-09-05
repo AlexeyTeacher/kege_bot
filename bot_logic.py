@@ -129,6 +129,8 @@ def doc(update, context):
     try:
         number_lesson = update.message.text.strip().replace('№', '')
         if number_lesson in [str(i) for i in range(1, 28)]:
+            if number_lesson in ('20', '21'):
+                number_lesson = '19'
             theme = session.query(EGENumber).filter(EGENumber.task_number == int(number_lesson)).first()
             doc_file = session.query(Document).filter(theme.id == Document.number_id).first()
             comment = ['Отличный выбор! 👍', 'Мне тоже нравится это задание! 😻',
@@ -167,6 +169,8 @@ def video(update, context):
     try:
         number_lesson = update.message.text.strip().replace('№', '')
         if number_lesson in [str(i) for i in range(1, 28)]:
+            if number_lesson in ('20', '21'):
+                number_lesson = '19'
             theme = session.query(EGENumber).filter(EGENumber.task_number == int(number_lesson)).first()
             video_file = session.query(Video).filter(theme.id == Video.number_id).first()
 
