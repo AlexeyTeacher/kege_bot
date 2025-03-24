@@ -1,8 +1,8 @@
 import logging
+import time
 from datetime import datetime
 import random
-
-from telegram import ParseMode, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import ParseMode, InlineKeyboardMarkup, InlineKeyboardButton, error as tg_error
 from telegram.ext import ConversationHandler
 
 from db import session
@@ -251,11 +251,14 @@ def example(update, context):
             session.commit()
 
             text = ''
-            gif_url = ''
+            gif_urls = []
             if '![](https://' in task.get("text"):
                 for line in task.get("text").split('\n'):
                     if '![](https://' in line:
-                        gif_url = line.replace('![](https://', '').replace('if)', 'if').strip()
+                        end_line = line.find(')')
+                        line = line[:end_line]
+                        line = line.replace('![](https://', '').replace('if)', 'if').strip()
+                        gif_urls.append(line)
                     else:
                         text += line + '\n'
             else:
@@ -265,8 +268,14 @@ def example(update, context):
                                       f"*Категория:* {task.get('category')} \n\n"
                                       f"{text}",
                                       parse_mode=ParseMode.MARKDOWN)
-            if gif_url:
-                context.bot.send_photo(update.message.chat_id, gif_url)
+            for gif_url in gif_urls:
+                # Добавил обработчик и небольшую задержка, чтобы сайт с источником не ругался
+                try:
+                    context.bot.send_photo(update.message.chat_id, gif_url)
+                except tg_error.BadRequest as e:
+                    logger.error(e)
+                    update.message.reply_text(f'Ссылка на иллюстрацию: https://{gif_url}')
+                time.sleep(0.5)
             if task.get('files'):
                 if number_example == '27':
                     update.message.reply_text(f'[Скачать файл A 💾]({task.get("files")[0].get("url")})\n'
