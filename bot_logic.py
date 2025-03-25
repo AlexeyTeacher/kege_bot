@@ -252,13 +252,18 @@ def example(update, context):
 
             text = ''
             gif_urls = []
-            if '![](https://' in task.get("text"):
-                for line in task.get("text").split('\n'):
+            print(task.get("text"))
+            task_text = task.get("text", '').replace('Даны два входных файла ( и ).', '\n')
+            if '![](https://' in task_text:
+                for line in task_text.split('\n'):
                     if '![](https://' in line:
                         end_line = line.find(')')
                         line = line[:end_line]
+                        other_text = line[end_line:]
                         line = line.replace('![](https://', '').replace('if)', 'if').strip()
                         gif_urls.append(line)
+                        if other_text.strip():
+                            text += other_text.strip() + '\n'
                     else:
                         text += line + '\n'
             else:
